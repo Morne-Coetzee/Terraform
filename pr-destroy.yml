@@ -1,0 +1,39 @@
+trigger: none
+
+pool:
+  name: pu-buildServer-eu
+
+variables:
+- name: ProjectName
+  value: kingprice.website
+- name: RepoFolderRelativePath # the root directory of the checkout step
+  value: KingPrice Website 1.5
+- name: TerraformFolderRelativePath
+  value: $(RepoFolderRelativePath)\source\kingprice.website.terraform
+- name: sql_administrator_login
+  value: puadmin
+- name: sql_administrator_login_password
+  value: '9xFy2]KK7HG>czEj*AHE'
+
+resources:
+  repositories:
+  - repository: DevOps
+    type: git
+    name: Utilities/DevOps
+
+steps:
+- checkout: DevOps
+- checkout: self
+
+- template: BuildTemplates/terraform-destroy.v1.yml@DevOps
+  parameters:
+    backendServiceArm: Azure DevTest - IT (2b96ea8a-0bcf-4bc7-ad01-567dfa389001)-KingPrice Website 1.5
+    backendAzureRmResourceGroupName: pu-rg-devtest-san-terraform-state
+    backendAzureRmStorageAccountName: pusadevtestitterrastore
+    backendAzureRmContainerName: pullrequest-tfstate
+    backendAzureRmKey: PR-$(SYSTEM.PULLREQUEST.PULLREQUESTID).$(ProjectName).tfstate
+    workingDirectory: $(TerraformFolderRelativePath)
+    environmentServiceNameAzureRM: Azure DevTest - IT (2b96ea8a-0bcf-4bc7-ad01-567dfa389001)-KingPrice Website 1.5
+    resourcePrefix: PR-$(SYSTEM.PULLREQUEST.PULLREQUESTID)-
+    varsFile: pu-devtest-premerge.tfvars
+    sqlAdminLoginPassword: $(sql_administrator_login_password)

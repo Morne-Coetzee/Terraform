@@ -1,0 +1,79 @@
+trigger: none
+
+pool:
+  name: pu-buildServer-eu
+
+variables:
+- name: BuildPlatform
+  value: 'Any CPU'
+- name: BuildConfiguration
+  value: 'Release'
+- name: ReleaseVersion
+  value: 1.0.0
+- name: ProjectName
+  value: kingprice.website
+- name: sql_administrator_login
+  value: puadmin
+- name: sql_administrator_login_password
+  value: '9xFy2]KK7HG>czEj*AHE'
+- name: RepoFolderRelativePath # the root directory of the checkout step
+  value: KingPrice Website 1.5
+- name: TerraformFolderRelativePath
+  value: $(RepoFolderRelativePath)\source\kingprice.website.terraform
+- name: ConnectionStrings.kingprice.website
+  value: 'Server=pu-sqlsrv-devtest-eu-shared.privatelink.database.windows.net;Initial Catalog=$(TFO_database_name);Persist Security Info=False;User ID=$(sql_administrator_login);Password=$(sql_administrator_login_password);MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=True;Connection Timeout=30;'
+- name: Solution
+  value: '$(RepoFolderRelativePath)/**/*.sln'
+
+# Application Config
+- name: Serilog.MinimumLevel.Default
+  value: Debug
+
+resources:
+  repositories:
+  - repository: DevOps
+    type: git
+    name: Utilities/DevOps
+
+steps:
+- checkout: DevOps
+- checkout: self
+- task: NuGetToolInstaller@1
+  displayName: Nuget Install
+
+- task: NuGetCommand@2
+  displayName: Nuget Restore
+  inputs:
+    restoreSolution: '$(Solution)'
+
+- task: VSBuild@1
+  displayName: Build Solution
+  inputs:
+    solution: '$(Solution)'
+    msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:PackageLocation="$(Build.ArtifactStagingDirectory)"'
+    platform: '$(buildPlatform)'
+    configuration: '$(buildConfiguration)'
+
+- template: BuildTemplates/terraform-create.v1.yml@DevOps
+  parameters:
+    backendServiceArm: Azure DevTest - IT (2b96ea8a-0bcf-4bc7-ad01-567dfa389001)-KingPrice Website 1.5
+    backendAzureRmResourceGroupName: pu-rg-devtest-san-terraform-state
+    backendAzureRmStorageAccountName: pusadevtestitterrastore
+    backendAzureRmContainerName: pullrequest-tfstate
+    backendAzureRmKey: PR-$(SYSTEM.PULLREQUEST.PULLREQUESTID).$(ProjectName).tfstate
+    workingDirectory: $(TerraformFolderRelativePath)
+    environmentServiceNameAzureRM: Azure DevTest - IT (2b96ea8a-0bcf-4bc7-ad01-567dfa389001)-KingPrice Website 1.5
+    resourcePrefix: PR-$(SYSTEM.PULLREQUEST.PULLREQUESTID)-
+    varsFile: pu-devtest-premerge.tfvars
+    outputFile: tfoutput.json
+    sqlAdminLoginPassword: $(sql_administrator_login_password)
+
+- task: AzureRmWebAppDeployment@4
+  displayName: 'Deploy Azure App Service'
+  inputs:
+    ConnectionType: 'AzureRM'
+    azureSubscription: 'Azure DevTest - IT (2b96ea8a-0bcf-4bc7-ad01-567dfa389001)-KingPrice Website 1.5'
+    appType: 'webApp'
+    WebAppName: '$(TFO_webapp_name)'
+    packageForLinux: '$(Build.ArtifactStagingDirectory)/*.zip'
+    JSONFiles: '**/appsettings.json'
