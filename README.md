@@ -1,2 +1,9 @@
-This repo contains a Terraform config I created for King Price to deploy envirmonents for the new, in development, website.
-** NB! This repo does contain sensitive info, please respect it :) **
+# Repository Overview
+
+This repository contains the Terraform configuration files used to deploy environments for the new website currently under development for King Price Insurance.
+
+---
+
+### **IMPORTANT NOTICE**
+
+### **NB! This repository contains sensitive information. Please handle it with care and respect the confidentiality of the data.**
